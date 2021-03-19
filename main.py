@@ -66,6 +66,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.btnConnect.clicked.connect(self.btn_connect_clicked)
         self.btnStart.clicked.connect(self.start_counting)
         self.btnStop.clicked.connect(self.stop_counting)
+        #self.radioFreeMode.setChecked(True)
+        self.spinLaps.setHidden(True)
+        self.btnStart.setEnabled(False)
 
     def update_comports(self):
         self.comboSerial.clear()
@@ -80,12 +83,25 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.initial_time = None
             self.laps = 0
             self.listData.clear()
-            self.ser.write("A".encode("ascii"))
-            self.counter.start()
+            self.update_counter(0)
+            self.btnStart.setEnabled(False)
+            self.radioLapsMode.setEnabled(False)
+            self.radioFreeMode.setEnabled(False)
+            self.checkFirstLap.setEnabled(False)
+            self.spinLaps.setEnabled(False)
+            if not self.checkFirstLap.isChecked():
+                self.ser.write("A".encode("ascii"))
+                self.counter.start()
 
     @pyqtSlot()
     def stop_counting(self):
         self.counting = False
+        self.btnStart.setEnabled(True)
+        self.radioLapsMode.setEnabled(True)
+        self.radioFreeMode.setEnabled(True)
+        self.checkFirstLap.setEnabled(True)
+        self.spinLaps.setEnabled(True)
+
 
     @pyqtSlot(str)
     def received_data(self, string):
@@ -93,12 +109,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             current_time = int(string)
             if self.initial_time is None:
                 self.initial_time = current_time
+                if self.checkFirstLap.isChecked():
+                    self.counter.start()
             else:
                 # print(self.millis_to_string(self, current_time - self.initial_time))
                 item = QListWidgetItem()
-                item.setText(f"lap {self.laps}: {self.millis_to_string(self, current_time - self.initial_time)}")
+                item.setText(f"lap {self.laps + 1}: {self.millis_to_string(self, current_time - self.initial_time)}")
                 self.laps += 1
                 self.listData.addItem(item)
+                if self.radioLapsMode.isChecked() and self.laps >= self.spinLaps.value():
+                    self.stop_counting()
+
 
     @pyqtSlot(int)
     def update_counter(self, millis):
@@ -116,6 +137,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.connected = True
             self.btnConnect.setText("Disconnect")
             self.comboSerial.setEnabled(False)
+            self.btnStart.setEnabled(True)
             self.receiver.start()
         else:
             self.restore_serial()
@@ -124,8 +146,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if self.ser.isOpen():
             self.ser.close()
         self.btnConnect.setText("Connect")
-        self.comboSerial.setEnabled(False)
+        self.comboSerial.setEnabled(True)
         self.connected = False
+        self.btnStart.setEnabled(False)
         self.update_comports()
 
     @staticmethod
